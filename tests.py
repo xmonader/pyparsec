@@ -37,8 +37,8 @@ twodigitparser = digitparser >> digitparser
 
 print(runParser(twodigitparser, "12abcd"))
 
-converToInt = lambda l: int("".join(l))
-twodigitparserAsInt = twodigitparser.map(converToInt)
+convertToInt = lambda l: int("".join(l))
+twodigitparserAsInt = twodigitparser.map(convertToInt)
 print(runParser(twodigitparserAsInt, "12abcd"))
 manyAparser = many(parseChar("a"))
 print(runParser(manyAparser, "aaab"))
@@ -53,7 +53,7 @@ print(runParser(many1aParser, "aaab"))
 print(runParser(many1aParser, "bbc")) # zero or more
 
 manyDigits = many1(digitparser)
-manyDigitsAsInt = manyDigits.map(converToInt)
+manyDigitsAsInt = manyDigits.map(convertToInt)
 print(runParser(manyDigitsAsInt, "12345bcd"))
 
 
@@ -102,3 +102,31 @@ adigitlist = sepBy1(whitespaceParser.suppress(), digitparser).map(onitem)
 
 print(runParser(adigitlist, '1 2 3 4 5'))
 
+adigitlist = sepBy(whitespaceParser.suppress(), digitparser)
+print(runParser(adigitlist, '1'))
+
+from functools import partial
+def add2(x, y):
+    print("X:",x  )
+    print("Y: ", y)
+    return x+y
+
+def add3(x, y, z):
+    return x+y+z
+def addargs(*args):
+    print("Args: ", args)
+    return reduce(sum, args)
+
+numparser = parseDigit().map(convertToInt)
+addparser2 = Parser(add2)
+p = applyP(addparser2, numparser >> numparser )
+print(runParser(p, "123"))
+
+addparser3 = Parser(addargs)
+
+p = applyP(addparser3, (numparser >> numparser >> numparser) )
+print(runParser(p, "123"))
+# p = parseDigit().map(converToInt) >> parseDigit().map(converToInt)
+print(runParser(p, "123"))
+# p = applyP(Parser(add3), parseDigit().map(convertToInt) >> parseDigit().map(convertToInt) >> parseDigit().map(convertToInt) )
+# print(runParser(p, "123"))

@@ -1,5 +1,6 @@
 from functools import reduce
 import string 
+flatten = lambda l: [item for sublist in l for item in sublist]
 
 class Maybe:
     pass
@@ -32,14 +33,19 @@ class Right:
     def __init__(self, val):
         self.val = val
 
+    @property
+    def val0(self):
+        try:
+            return flatten(self.val[0])
+        except:
+            return [self.val[0]]
     def __str__(self):
         return "(Right %s)"% str(self.val)
     
     def map(self, f):
-        flatlist = [item for sublist in self.val[0] for item in sublist]
+        # flatlist = [item for sublist in self.val0 for item in sublist]
 
-        return Right( (f(flatlist), self.val[1])) 
-
+        return Right( (f(self.val0), self.val[1])) 
 
 class Parser:
     def __init__(self, f):
@@ -66,6 +72,26 @@ class Parser:
         self._suppressed = True 
         return self
 
+    # def apply(self, f, otherP):
+    #     arg1 = lambda : self.f 
+    #     arg2 = lambda : otherP.f
+    #     return lambda inp: f(arg1(inp), arg2(inp))
+
+def pureP(x):
+    def curried(s):
+        return Right((x, s))
+    return Parser(curried)
+
+def applyP(p1, p2):
+    def curried(s):
+        print("S: ", s, type(s))
+        res = p2(s)
+        print("RES: ", res)
+        return p1(*res.val[0])
+
+    return curried
+    
+
 def compose(p1, p2):
     def newf(*args, **kwargs):
         return p2(p1(*args, **kwargs))
@@ -82,13 +108,13 @@ def andThen(p1, p2):
         else:
             res2 = p2(res1.val[1]) # parse remaining chars.
             if isinstance(res2, Right):
-                v1 = res1.val[0]
-                v2 = res2.val[0]
+                v1 = res1.val0
+                v2 = res2.val0
                 vs = []
                 if not p1._suppressed:
-                    vs.append(v1)
+                    vs += v1
                 if not p2._suppressed:
-                    vs.append(v2)
+                    vs += v2
 
                 return Right( (vs, res2.val[1])) 
             return res2
@@ -143,10 +169,13 @@ def parseZeroOrMore(parser, inp): #zero or more
         firstval, restinpafterfirst = res.val
         subseqvals, remaining = parseZeroOrMore(parser, restinpafterfirst)
         values = None
+        # print("FIRST VAL: ", firstval, type(firstval))
+        # print("SUBSEQ: ", subseqvals, type(subseqvals))
         if isinstance(firstval, str):
             values = firstval+subseqvals
         elif isinstance(firstval, list):
             values = firstval+ ([subseqvals] if isinstance(subseqvals, str) else subseqvals)
+        # print("VALUES: ", values, "REM: ", remaining)
         return values, remaining
 
 def many(parser):
@@ -176,4 +205,8 @@ between = lambda p1, p2 , p3 : p1 >> p2 >> p3
 def sepBy1(sep, parser):
     sep_then_parser = sep >> parser
     return parser >> many(sep_then_parser)
+
+def sepBy(sep, parser):
+    return (sepBy1(sep, parser) | Parser(lambda x: Right( ([], ""))))
+
 

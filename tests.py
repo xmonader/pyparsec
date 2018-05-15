@@ -53,6 +53,7 @@ print(runParser(many1aParser, "aaab"))
 print(runParser(many1aParser, "bbc")) # zero or more
 
 manyDigits = many1(digitparser)
+
 manyDigitsAsInt = manyDigits.map(convertToInt)
 print(runParser(manyDigitsAsInt, "12345bcd"))
 
@@ -98,7 +99,7 @@ def onitem(l):
     return l 
 
 
-adigitlist = sepBy1(whitespaceParser.suppress(), digitparser).map(onitem)
+adigitlist = sepBy(whitespaceParser.suppress(), digitparser)
 
 print(runParser(adigitlist, '1 2 3 4 5'))
 
@@ -115,7 +116,7 @@ def add3(x, y, z):
     return x+y+z
 def addargs(*args):
     print("Args: ", args)
-    return reduce(sum, args)
+    return sum(args)
 
 numparser = parseDigit().map(convertToInt)
 addparser2 = Parser(add2)
@@ -126,7 +127,22 @@ addparser3 = Parser(addargs)
 
 p = applyP(addparser3, (numparser >> numparser >> numparser) )
 print(runParser(p, "123"))
-# p = parseDigit().map(converToInt) >> parseDigit().map(converToInt)
+p = numparser >> numparser >> numparser
 print(runParser(p, "123"))
-# p = applyP(Parser(add3), parseDigit().map(convertToInt) >> parseDigit().map(convertToInt) >> parseDigit().map(convertToInt) )
-# print(runParser(p, "123"))
+
+def forward(parsergeneratorfn):
+    def curried(s):
+        return parsergeneratorfn()(s)
+    return curried
+
+nump = digitparser
+valp = forward(lambda:  digitparser | listp) 
+listp = parseChar("[") >> sepBy(parseChar(",").suppress(),many(valp)) >> parseChar("]")
+
+print(runParser(valp, "4"))
+print(valp("[8,6,7]"))
+print(valp("[1,2,[1,2]]"))
+
+surp = parseChar("'")
+qword = surroundedBy(surp, many(anyOf(string.ascii_letters)))
+print(qword("'hello'"))

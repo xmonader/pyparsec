@@ -1,6 +1,6 @@
 from functools import reduce
 import string 
-flatten = lambda l: [item for sublist in l for item in sublist]
+flatten = lambda l: [item for sublist in l for item in (sublist if isinstance(sublist, list) else [sublist] )]
 
 class Maybe:
     pass
@@ -35,13 +35,14 @@ class Right:
 
     @property
     def val0(self):
-        try:
+        if isinstance(self.val[0], list):
             return flatten(self.val[0])
-        except:
+        else:
             return [self.val[0]]
+
     def __str__(self):
         return "(Right %s)"% str(self.val)
-    
+    __repr__ = __str__
     def map(self, f):
         # flatlist = [item for sublist in self.val0 for item in sublist]
 
@@ -72,11 +73,6 @@ class Parser:
         self._suppressed = True 
         return self
 
-    # def apply(self, f, otherP):
-    #     arg1 = lambda : self.f 
-    #     arg2 = lambda : otherP.f
-    #     return lambda inp: f(arg1(inp), arg2(inp))
-
 def pureP(x):
     def curried(s):
         return Right((x, s))
@@ -84,13 +80,9 @@ def pureP(x):
 
 def applyP(p1, p2):
     def curried(s):
-        print("S: ", s, type(s))
         res = p2(s)
-        print("RES: ", res)
         return p1(*res.val[0])
-
     return curried
-    
 
 def compose(p1, p2):
     def newf(*args, **kwargs):
@@ -133,7 +125,6 @@ def orElse(p1, p2):
                 return Left("Failed at both") 
     return Parser(curried)
 
-
 def parseChar(c):
     def curried(s):
         if not s:
@@ -154,9 +145,8 @@ def choice(parsers):
 def anyOf(chars):
     return choice(list(map(parseChar, chars)))
 
-
 def parseString(s):
-    return foldl(andThen, list(map(parseChar, list(s))))
+    return foldl(andThen, list(map(parseChar, list(s)))).map(lambda l: "".join(l))
 
 def parseDigit():
     return anyOf(list(string.digits))
@@ -168,14 +158,12 @@ def parseZeroOrMore(parser, inp): #zero or more
     else:
         firstval, restinpafterfirst = res.val
         subseqvals, remaining = parseZeroOrMore(parser, restinpafterfirst)
-        values = None
-        # print("FIRST VAL: ", firstval, type(firstval))
-        # print("SUBSEQ: ", subseqvals, type(subseqvals))
-        if isinstance(firstval, str):
-            values = firstval+subseqvals
-        elif isinstance(firstval, list):
-            values = firstval+ ([subseqvals] if isinstance(subseqvals, str) else subseqvals)
-        # print("VALUES: ", values, "REM: ", remaining)
+        values = firstval
+        if subseqvals:
+            if isinstance(firstval, str):
+                values = firstval+subseqvals
+            elif isinstance(firstval, list):
+                values = firstval+ ([subseqvals] if isinstance(subseqvals, str) else subseqvals)
         return values, remaining
 
 def many(parser):
@@ -201,6 +189,7 @@ def optionally(parser):
     return orElse(parser, noneparser)
 
 between = lambda p1, p2 , p3 : p1 >> p2 >> p3
+surroundedBy = lambda surparser, contentparser: surparser >> contentparser >> surparser
 
 def sepBy1(sep, parser):
     sep_then_parser = sep >> parser
@@ -209,4 +198,24 @@ def sepBy1(sep, parser):
 def sepBy(sep, parser):
     return (sepBy1(sep, parser) | Parser(lambda x: Right( ([], ""))))
 
+def forward(parsergeneratorfn):
+    def curried(s):
+        return parsergeneratorfn()(s)
+    return curried
 
+letter_p = anyOf(string.ascii_letters)
+lletter_p = anyOf(string.ascii_lowercase)
+uletter_p = anyOf(string.ascii_uppercase)
+digit_p = anyOf(string.digits)
+num_p = many1(digit_p)
+whitespace_p = anyOf(string.whitespace)
+ws_p = whitespace_p.suppress()
+letters_p = many1(letter_p)
+word_p = letters_p
+char_p = parseChar
+int_p = num_p.map(lambda l: int("".join(l)))
+# quotedword_p = between(char_p('"'), word_p, char_p('"'))
+quotedword_p = surroundedBy( (char_p('"')|char_p("'")).suppress() , word_p)
+option_p = optionally
+
+commasepareted_p = sepBy(char_p(",").suppress(), many1(word_p) | many1(digit_p) | many1(quotedword_p))

@@ -1,5 +1,6 @@
 from functools import reduce
 import string 
+import copy
 flatten = lambda l: [item for sublist in l for item in (sublist if isinstance(sublist, list) else [sublist] )]
 
 class Maybe:
@@ -57,6 +58,7 @@ class Right:
     def map(self, f):
         return Right( (f(self.val0), self.val[1])) 
 
+
 class Parser:
     def __init__(self, f):
         self.f = f
@@ -79,6 +81,8 @@ class Parser:
     def map(self, transformer):
         return Parser(lambda *args, **kwargs: self.f(*args, **kwargs).map(transformer))
 
+    def __mul__(self, times):
+       return n(self, times) 
 
     set_action = map
 
@@ -130,6 +134,20 @@ def and_then(p1, p2):
 
                 return Right( (vs, res2.val[1])) 
             return res2
+    return Parser(curried)
+
+def n(parser, count):
+    def curried(s):
+        fullparsed = ""
+        for i in range(count):
+            res = parser(s)
+            if isinstance(res, Left):
+                return res
+            else:
+                parsed, remaining = res.unwrap()
+                s = remaining
+                fullparsed += parsed
+        return Right((fullparsed, s))
     return Parser(curried)
 
 def or_else(p1, p2):
@@ -219,7 +237,6 @@ def many1(parser):
         else:
             return run_parser(many(parser), s)
     return Parser(curried)
-
 
 
 def optionally(parser):

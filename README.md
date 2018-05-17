@@ -7,9 +7,9 @@ python parser combinators (parsec) library (under development)
 
 In [2]: from pyparsec import *
 
-In [3]: aparser = parseChar("a")
+In [3]: aparser = char("a")
 
-In [4]: bparser = parseChar("b")
+In [4]: bparser = char("b")
 
 In [5]: aparser("abc")
 Out[5]: (Right ('a', 'bc'))
@@ -20,7 +20,7 @@ Out[6]: <pyparsec.pyparsec.Left at 0x7f5fdd6746a0>
 In [7]: bparser("bca")
 Out[7]: (Right ('b', 'ca'))
 ```
-so to create a parser for 1 character you use `parseChar`
+so to create a parser for 1 character you use `char`
 and to run parser you call it with input string 
 
 ```ipython
@@ -30,10 +30,10 @@ Out[8]: (Right ('a', 'bc'))
 In [9]: aparser("abc")
 Out[9]: (Right ('a', 'bc'))
 
-In [10]: runParser(aparser, "abc")
+In [10]: run_parser(aparser, "abc")
 Out[10]: (Right ('a', 'bc'))
 ```
-using `__call__` is the same as calling `.parse` or calling `runParser` directly
+using `__call__` is the same as calling `.parse` or calling `run_parser` directly
 
 ### you can combine parsers using `>>`
 
@@ -65,7 +65,7 @@ Out[17]: (Right ('b', 'def'))
 
 In [2]: from pyparsec import *
 
-In [3]: sentp = letters >> parseChar(",") >> many(whitespaceParser) >> letters >> optionally(parseChar("!"))
+In [3]: sentp = letters >> char(",") >> many(whitespace) >> letters >> optionally(char("!"))
 
 In [4]: sent = "Hello, World!"
 
@@ -76,7 +76,7 @@ Out[5]: (Right (['Hello', ',', ' ', 'World', '!'], ''))
 
 ### transform!
 ```ipython
-In [8]: sentp = letters.map(lambda l: "".join(l).upper()) >> parseChar(",") >> many(whitespaceParser) >> letters >> optionally(parseChar("!"))
+In [8]: sentp = letters.map(lambda l: "".join(l).upper()) >> char(",") >> many(whitespace) >> letters >> optionally(char("!"))
 
 In [9]: sentp.parse(sent)
 Out[9]: (Right (['HELLO', ',', ' ', 'World', '!'], ''))
@@ -87,8 +87,7 @@ you can map a function to be applied on a `list` parsed by a parser.
 ### suppress
 you can also suppress certain parsed values 
 ```
-In [12]: sentp = letters.map(lambda l: "".join(l).upper()) >> parseChar(",").suppress() >> many(whitespaceParser).suppress() >> letters >> optionally(parseCh
-    ...: ar("!")).suppress()
+In [12]: sentp = letters.map(lambda l: "".join(l).upper()) >> char(",").suppress() >> many(whitespace).suppress() >> letters >> optionally(char("!")).suppress()
 
 In [13]: sentp.parse(sent)
 Out[13]: (Right (['HELLO', 'World'], ''))
@@ -96,7 +95,7 @@ Out[13]: (Right (['HELLO', 'World'], ''))
 
 ```
 In [17]: lowerparser = anyOf(string.ascii_lowercase)
-In [18]: singlequote = parseChar('"')
+In [18]: singlequote = char('"')
 
 In [20]: quotedword = between(singlequote, many1(lowerparser), singlequote)
     ...: print(quotedword('"abc"'))
@@ -108,21 +107,20 @@ In [20]: quotedword = between(singlequote, many1(lowerparser), singlequote)
 In [23]: digitparser = anyOf(string.digits)
     ...:
 
-In [24]: adigitlist = sepBy(whitespaceParser.suppress(), digitparser)
+In [24]: adigitlist = sepBy(whitespace.suppress(), digitparser)
     ...:
 
-In [25]: print(runParser(adigitlist, '1 2 3 4 5'))
+In [25]: print(run_parser(adigitlist, '1 2 3 4 5'))
     ...:
 (Right (['1', '2', '3', '4', '5'], ''))
 ```
 
 ### forward declarations
 ```ipython
-In [4]: nump = digitparser
-   ...: valp = forward(lambda:  digitparser | listp)
-   ...: listp = parseChar("[") >> sepBy(parseChar(",").suppress(),many(valp)) >> parseChar("]")
+In [4]: valp = forward(lambda:  digits | listp)
+   ...: listp = char("[") >> sepBy(char(",").suppress(),many(valp)) >> char("]")
    ...:
-   ...: print(runParser(valp, "4"))
+   ...: print(run_parser(valp, "4"))
    ...: print(valp("[8,6,7]"))
    ...: print(valp("[1,2,[1,2]]"))
    ...:
@@ -136,38 +134,30 @@ In [4]: nump = digitparser
 ```ipython
 In [1]: from pyparsec import *
 
-In [2]: letter_p("abc")
+In [2]: letter("abc")
 Out[2]: (Right ('a', 'bc'))
 
-In [3]: letters_p("abc")
+In [3]: letters("abc")
 Out[3]: (Right ('abc', ''))
 
-In [4]: word_p("abc")
+In [4]: word("abc")
 Out[4]: (Right ('abc', ''))
 
-In [5]: word_p("123")
+In [5]: word("123")
 Out[5]: <pyparsec.pyparsec.Left at 0x7fea1904c048>
 
-In [6]: num_p("123")
+In [6]: digits("123")
 Out[6]: (Right ('123', ''))
 
-In [7]: int_p("123")
+In [7]: digits_as_int("123")
 Out[7]: (Right (123, ''))
 
-In [8]: quotedword_p('"Hello, World"')
+In [8]: quotedword('"Hello, World"')
 Out[8]: <pyparsec.pyparsec.Left at 0x7fea1904f7b8>
 
-In [9]: quotedword_p('"Hello"')
+In [9]: quotedword('"Hello"')
 Out[9]: (Right (['"', 'Hello', '"'], ''))
 
-In [7]: commasepareted_p('1,2,3')
-Out[7]: (Right (['1', '2', '3'], ''))
-
-In [8]: commasepareted_p('a,b,c')
-Out[8]: (Right (['a', 'b', 'c'], ''))
-
-In [9]: commasepareted_p('"a","b","c"')
-Out[9]: (Right (['a', 'b', 'c'], ''))
 ```
 
 

@@ -13,6 +13,12 @@ class Just(Maybe):
         return "<Just %s>"%str(self.val)
     
 class Nothing(Maybe):
+    _instance = None
+    def __new__(class_, *args, **kwargs):
+        if not isinstance(class_._instance, class_):
+            class_._instance = object.__new__(class_, *args, **kwargs)
+        return class_._instance
+
     def __str__(self):
         return "<Nothing>"
 
@@ -26,12 +32,16 @@ class Left:
     def __str__(self):
         return "(Left %s)"%self.errmsg
 
+    __repr__ = __str__
     def map(self, f):
         return self 
 
 class Right:
     def __init__(self, val):
         self.val = val
+
+    def unwrap(self):
+        return self.val
 
     @property
     def val0(self):
@@ -43,9 +53,8 @@ class Right:
     def __str__(self):
         return "(Right %s)"% str(self.val)
     __repr__ = __str__
-    def map(self, f):
-        # flatlist = [item for sublist in self.val0 for item in sublist]
 
+    def map(self, f):
         return Right( (f(self.val0), self.val[1])) 
 
 class Parser:
@@ -59,26 +68,26 @@ class Parser:
     __call__ = parse
     
     def __rshift__(self, rparser):
-        return andThen(self, rparser)
+        return and_then(self, rparser)
     
     def __or__(self, rparser):
-        return orElse(self, rparser)
+        return or_else(self, rparser)
 
     def map(self, transformer):
         return Parser(lambda *args, **kwargs: self.f(*args, **kwargs).map(transformer))
 
-    setAction = map
+    set_action = map
 
     def suppress(self):
         self._suppressed = True 
         return self
 
-def pureP(x):
+def pure(x):
     def curried(s):
         return Right((x, s))
     return Parser(curried)
 
-def applyP(p1, p2):
+def ap(p1, p2):
     def curried(s):
         res = p2(s)
         return p1(*res.val[0])
@@ -89,10 +98,19 @@ def compose(p1, p2):
         return p2(p1(*args, **kwargs))
     return newf
 
-def runParser(p, inp):
+def run_parser(p, inp):
     return p(inp)
 
-def andThen(p1, p2):
+def _isokval(v):
+    if isinstance(v, str) and not v.strip():
+        return False
+    if isinstance(v, list) and v and v[0] == "":
+        return False
+
+    return True
+
+def and_then(p1, p2):
+    
     def curried(s):
         res1 = p1(s)
         if isinstance(res1, Left):
@@ -103,16 +121,16 @@ def andThen(p1, p2):
                 v1 = res1.val0
                 v2 = res2.val0
                 vs = []
-                if not p1._suppressed:
-                    vs += v1
-                if not p2._suppressed:
+                if not p1._suppressed and _isokval(v1):
+                    vs += v1 
+                if not p2._suppressed and _isokval(v2):
                     vs += v2
 
                 return Right( (vs, res2.val[1])) 
             return res2
     return Parser(curried)
 
-def orElse(p1, p2):
+def or_else(p1, p2):
     def curried(s):
         res = p1(s)
         if isinstance(res, Right):
@@ -125,7 +143,7 @@ def orElse(p1, p2):
                 return Left("Failed at both") 
     return Parser(curried)
 
-def parseChar(c):
+def char(c):
     def curried(s):
         if not s:
             msg = "S is empty"
@@ -135,29 +153,38 @@ def parseChar(c):
                 return Right((c, s[1:]) )
             else:
                 return Left("Expecting '%s' and found '%s'"%(c, s[0]))
-    return Parser(curried)
+    return Parser(curried).suppress()
 
 foldl = reduce
 def choice(parsers):
-    return foldl(orElse, parsers)
+    return foldl(or_else, parsers)
 
 
-def anyOf(chars):
-    return choice(list(map(parseChar, chars)))
+def any_of(chars):
+    return choice(list(map(char, chars)))
 
-def parseString(s):
-    return foldl(andThen, list(map(parseChar, list(s)))).map(lambda l: "".join(l))
+def parse_string(s):
+    return foldl(and_then, list(map(char, list(s)))).map(lambda l: "".join(l))
 
-def parseDigit():
-    return anyOf(list(string.digits))
+def until(seq):
+    def curried(s):
+        if not s:
+            msg = "S is empty"
+            return Left(msg)
+        else:
+            if seq == s[:len(seq)]:
+                return Right(("", s))
+            else:
+                return Left("Expecting '%s' and found '%s'"%(seq, s[:len(seq)]))
+    return Parser(curried)
 
-def parseZeroOrMore(parser, inp): #zero or more
+def parse_zero_or_more(parser, inp): #zero or more
     res = parser(inp)
     if isinstance(res, Left):
         return "", inp
     else:
         firstval, restinpafterfirst = res.val
-        subseqvals, remaining = parseZeroOrMore(parser, restinpafterfirst)
+        subseqvals, remaining = parse_zero_or_more(parser, restinpafterfirst)
         values = firstval
         if subseqvals:
             if isinstance(firstval, str):
@@ -168,54 +195,53 @@ def parseZeroOrMore(parser, inp): #zero or more
 
 def many(parser):
     def curried(s):
-        return Right(parseZeroOrMore(parser,s))
+        return Right(parse_zero_or_more(parser,s))
     return Parser(curried)
 
 
 def many1(parser):
     def curried(s):
-        res = runParser(parser, s)
+        res = run_parser(parser, s)
         if isinstance(res, Left):
             return res
         else:
-            return runParser(many(parser), s)
+            return run_parser(many(parser), s)
     return Parser(curried)
 
 
-whitespaceParser = anyOf(string.whitespace)
 
 def optionally(parser):
     noneparser = Parser(lambda x: Right( (Nothing(), "")))
-    return orElse(parser, noneparser)
+    return or_else(parser, noneparser)
 
-between = lambda p1, p2 , p3 : p1 >> p2 >> p3
-surroundedBy = lambda surparser, contentparser: surparser >> contentparser >> surparser
-
-def sepBy1(sep, parser):
+def sep_by1(sep, parser):
     sep_then_parser = sep >> parser
     return parser >> many(sep_then_parser)
 
-def sepBy(sep, parser):
-    return (sepBy1(sep, parser) | Parser(lambda x: Right( ([], ""))))
+def sep_by(sep, parser):
+    return (sep_by1(sep, parser) | Parser(lambda x: Right( ([], ""))))
 
 def forward(parsergeneratorfn):
     def curried(s):
         return parsergeneratorfn()(s)
     return curried
 
-letter_p = anyOf(string.ascii_letters)
-lletter_p = anyOf(string.ascii_lowercase)
-uletter_p = anyOf(string.ascii_uppercase)
-digit_p = anyOf(string.digits)
-num_p = many1(digit_p)
-whitespace_p = anyOf(string.whitespace)
-ws_p = whitespace_p.suppress()
-letters_p = many1(letter_p)
-word_p = letters_p
-char_p = parseChar
-int_p = num_p.map(lambda l: int("".join(l)))
-# quotedword_p = between(char_p('"'), word_p, char_p('"'))
-quotedword_p = surroundedBy( (char_p('"')|char_p("'")).suppress() , word_p)
-option_p = optionally
+letter = any_of(string.ascii_letters)
+lletter = any_of(string.ascii_lowercase)
+uletter = any_of(string.ascii_uppercase)
+digit = any_of(string.digits)
+digits = many1(digit)
+whitespace = any_of(string.whitespace)
+ws = whitespace.suppress()
+letters = many1(letter)
+word = letters
+alphanumword = many(letter >> (letters|digits))
+num_as_int = digits.map(lambda l: int("".join(l)))
+between = lambda p1, p2 , p3 : p1 >> p2 >> p3
+surrounded_by = lambda surparser, contentparser: surparser >> contentparser >> surparser
+quotedword = surrounded_by( (char('"')|char("'")).suppress() , word)
+option = optionally
 
-commasepareted_p = sepBy(char_p(",").suppress(), many1(word_p) | many1(digit_p) | many1(quotedword_p))
+# commasepareted_p = sep_by(char(",").suppress(), many1(word) | many1(digit) | many1(quotedword))
+commaseparated_of = lambda p: sep_by(char(",").suppress(), many(p))
+

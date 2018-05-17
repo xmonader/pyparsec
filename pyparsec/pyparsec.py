@@ -1,6 +1,5 @@
 from functools import reduce
 import string 
-import copy
 flatten = lambda l: [item for sublist in l for item in (sublist if isinstance(sublist, list) else [sublist] )]
 
 class Maybe:

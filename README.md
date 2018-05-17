@@ -177,4 +177,22 @@ In [7]: ifstmt.parse("IF x is ok:")
 Out[7]: (Right (['IF', ' x is ok', ':'], ''))
 ```
 
+### parsing uuids
+```ipython
+
+In [1]: from pyparsec import *
+
+In [2]: hexstr = any_of(string.hexdigits)
+
+In [3]: s = "db9674c4-72a9-4ab9-9ddd-1d641a37cde4"
+
+In [4]: uuidparser =((hexstr*8) >> char("-") >> (hexstr*4) >> char("-") >>  (hexstr*4) >> char("-") >> (hexstr*4) >> char("-") >> (hexstr*12))
+
+In [5]: uuidparser(s)
+Out[5]: (Right (['db9674c4', '-', '72a9', '-', '4ab9', '-', '9ddd', '-', '1d641a37cde4'], ''))
+
+In [7]: uuidparser(s[1:5])
+Out[7]: (Left Failed at both)
+```
+
 > It's not production ready, please use pyparsing instead or send me PRs to make it better :)

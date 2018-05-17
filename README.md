@@ -160,6 +160,21 @@ Out[9]: (Right (['"', 'Hello', '"'], ''))
 
 ```
 
+### untils
 
+```ipython
+In [2]: ifstmt = chars("IF") >> many1( word | whitespace) << until(char(":"))
+
+In [4]: ifstmt.parse("IF x is ok:")
+Out[4]: (Right (['IF', ' x is ok'], ':'))
+
+In [5]: ifstmt.parse("IF x is ok:")
+Out[5]: (Right (['IF', ' x is ok'], ':'))
+
+In [6]: ifstmt = chars("IF") >> many1( word | whitespace) << until(char(":")) >> char(":")
+
+In [7]: ifstmt.parse("IF x is ok:")
+Out[7]: (Right (['IF', ' x is ok', ':'], ''))
+```
 
 > It's not production ready, please use pyparsing instead or send me PRs to make it better :)

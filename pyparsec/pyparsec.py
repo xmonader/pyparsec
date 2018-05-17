@@ -69,12 +69,16 @@ class Parser:
     
     def __rshift__(self, rparser):
         return and_then(self, rparser)
+
+    def __lshift__(self, rparser):
+        return and_then(self, rparser)
     
     def __or__(self, rparser):
         return or_else(self, rparser)
 
     def map(self, transformer):
         return Parser(lambda *args, **kwargs: self.f(*args, **kwargs).map(transformer))
+
 
     set_action = map
 
@@ -106,11 +110,9 @@ def _isokval(v):
         return False
     if isinstance(v, list) and v and v[0] == "":
         return False
-
     return True
 
 def and_then(p1, p2):
-    
     def curried(s):
         res1 = p1(s)
         if isinstance(res1, Left):
@@ -153,12 +155,11 @@ def char(c):
                 return Right((c, s[1:]) )
             else:
                 return Left("Expecting '%s' and found '%s'"%(c, s[0]))
-    return Parser(curried).suppress()
+    return Parser(curried)
 
 foldl = reduce
 def choice(parsers):
     return foldl(or_else, parsers)
-
 
 def any_of(chars):
     return choice(list(map(char, chars)))
@@ -166,7 +167,7 @@ def any_of(chars):
 def parse_string(s):
     return foldl(and_then, list(map(char, list(s)))).map(lambda l: "".join(l))
 
-def until(seq):
+def until_seq(seq):
     def curried(s):
         if not s:
             msg = "S is empty"
@@ -177,6 +178,17 @@ def until(seq):
             else:
                 return Left("Expecting '%s' and found '%s'"%(seq, s[:len(seq)]))
     return Parser(curried)
+
+def until(p):
+    def curried(s):
+        res = p(s)
+        if isinstance(res, Left):
+            return res
+        else:
+            return Right(("", s))
+    return Parser(curried)
+
+chars = parse_string
 
 def parse_zero_or_more(parser, inp): #zero or more
     res = parser(inp)

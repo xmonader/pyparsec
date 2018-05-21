@@ -127,7 +127,7 @@ def and_then(p1, p2):
                 v2 = res2.val0
                 vs = []
                 if not p1._suppressed and _isokval(v1):
-                    vs += v1 
+                    vs += v1
                 if not p2._suppressed and _isokval(v2):
                     vs += v2
 
@@ -194,6 +194,30 @@ def until_seq(seq):
                 return Right(("", s))
             else:
                 return Left("Expecting '%s' and found '%s'"%(seq, s[:len(seq)]))
+    return Parser(curried)
+
+def group(p):
+    def curried(s):
+        if not s:
+            msg = "S is empty"
+            return Left(msg)
+        else:
+            res = p.parse(s)
+            if isinstance(res, Left):
+                return res
+            else:
+                return Right(([res.val[0]], res.val[1]))
+    return Parser(curried)
+
+def pushseq(seq):
+    def curried(s):
+        if not s:
+            msg = "S is empty"
+            return Left(msg)
+        else:
+            s = seq + s
+            return Right(("", s))
+
     return Parser(curried)
 
 def until(p):

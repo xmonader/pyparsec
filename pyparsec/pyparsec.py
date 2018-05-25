@@ -45,10 +45,11 @@ class Right:
 
     @property
     def val0(self):
-        if isinstance(self.val[0], list):
-            return flatten(self.val[0])
-        else:
-            return [self.val[0]]
+        # if isinstance(self.val[0], list):
+        #     return flatten(self.val[0])
+        # else:
+        #     return [self.val[0]]
+        return self.val[0]
 
     def __str__(self):
         return "(Right %s)"% str(self.val)
@@ -61,6 +62,7 @@ class Right:
 class Parser:
     def __init__(self, f):
         self.f = f
+        self.name = ""
         self._suppressed = False
 
     def parse(self, *args, **kwargs):
@@ -89,6 +91,14 @@ class Parser:
         self._suppressed = True 
         return self
 
+    def group(self):
+        return group(self)
+
+    def setname(self, name=""):
+        self.name = name or self.__class__.__name__
+
+    
+
 def pure(x):
     def curried(s):
         return Right((x, s))
@@ -106,7 +116,9 @@ def compose(p1, p2):
     return newf
 
 def run_parser(p, inp):
-    return p(inp)
+    res = p(inp)
+    print("RES: ", res)
+    return res
 
 def _isokval(v):
     if isinstance(v, str) and not v.strip():
@@ -123,8 +135,8 @@ def and_then(p1, p2):
         else:
             res2 = p2(res1.val[1]) # parse remaining chars.
             if isinstance(res2, Right):
-                v1 = res1.val0
-                v2 = res2.val0
+                v1 = [res1.val0]
+                v2 = [res2.val0]
                 vs = []
                 if not p1._suppressed and _isokval(v1):
                     vs += v1
@@ -248,7 +260,9 @@ def parse_zero_or_more(parser, inp): #zero or more
 
 def many(parser):
     def curried(s):
-        return Right(parse_zero_or_more(parser,s))
+        values, rem = parse_zero_or_more(parser, s)
+        # print("VALUES: ", values)
+        return Right((values, rem))
     return Parser(curried)
 
 

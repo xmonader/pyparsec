@@ -1,5 +1,8 @@
 from functools import reduce
 import string 
+import sys
+
+sys.setrecursionlimit(100000)
 flatten = lambda l: [item for sublist in l for item in (sublist if isinstance(sublist, list) else [sublist] )]
 
 class Maybe:
@@ -37,35 +40,61 @@ class Left:
         return self 
 
 class Right:
-    def __init__(self, val):
-        self.val = val
+    def __init__(self, state):
+        self.state = state
 
     def unwrap(self):
-        return self.val
+        return self.state
 
-    @property
-    def val0(self):
-        # if isinstance(self.val[0], list):
-        #     return flatten(self.val[0])
-        # else:
-        #     return [self.val[0]]
-        return self.val[0]
+    # @property
+    # def val0(self):
+    #     # if isinstance(self.val[0], list):
+    #     #     return flatten(self.val[0])
+    #     # else:
+    #     #     return [self.val[0]]
+    #     return self.state.parsed
 
     def __str__(self):
-        return "(Right %s)"% str(self.val)
+        return "(Right %s)"% str(self.state)
     __repr__ = __str__
 
     def map(self, f):
-        return Right( (f(self.val0), self.val[1])) 
+        return Right(State(f(self.state.parsed), self.state.remaining))
 
+class State:
+    def __init__(self, parsed, remaining=""):
+        self.parsed = parsed
+        self.remaining = remaining
+        self.val = (parsed, remaining)
+        self.txt = ""
+        self.idx = 0
+
+    @property
+    def line(self):
+        return len(self.txt[:self.idx].splitlines())
+
+    @property
+    def col(self):
+        txtuntilnow = self.txt[:self.idx]
+        return len(txtuntilnow) - (txtuntilnow.rindex("\n") if "\n" in txtuntilnow else 0)
+
+    def __getitem__(self, idx):
+        return self.val[idx]        
+
+    def __str__(self):
+        return "@{}(line {}, column {})  ('{}', '{}')".format(self.idx, self.line, self.col, self.parsed, self.remaining)
+    
+    __repr__ = __str__
 
 class Parser:
     def __init__(self, f):
         self.f = f
         self.name = ""
         self._suppressed = False
+        self._originalf = self.f
 
     def parse(self, *args, **kwargs):
+        # print("Calling parse with args: ", *args)
         return self.f(*args, **kwargs)
 
     __call__ = parse
@@ -80,7 +109,9 @@ class Parser:
         return or_else(self, rparser)
 
     def map(self, transformer):
-        return Parser(lambda *args, **kwargs: self.f(*args, **kwargs).map(transformer))
+        p =  Parser(lambda *args, **kwargs: self.f(*args, **kwargs).map(transformer))
+        p._originalf = self.f
+        return p
 
     def __mul__(self, times):
        return n(self, times) 
@@ -97,7 +128,6 @@ class Parser:
     def setname(self, name=""):
         self.name = name or self.__class__.__name__
 
-    
 
 def pure(x):
     def curried(s):
@@ -117,7 +147,6 @@ def compose(p1, p2):
 
 def run_parser(p, inp):
     res = p(inp)
-    print("RES: ", res)
     return res
 
 def _isokval(v):
@@ -133,17 +162,23 @@ def and_then(p1, p2):
         if isinstance(res1, Left):
             return res1
         else:
-            res2 = p2(res1.val[1]) # parse remaining chars.
+            state1 = res1.state
+            res2 = p2(state1.remaining) # parse remaining chars.
             if isinstance(res2, Right):
-                v1 = [res1.val0]
-                v2 = [res2.val0]
+                state2 = res2.state
+                v1 = state1.parsed
+                v2 = state2.parsed
                 vs = []
                 if not p1._suppressed and _isokval(v1):
                     vs += v1
                 if not p2._suppressed and _isokval(v2):
                     vs += v2
+                resstate = State(parsed=vs, remaining=state2.remaining)
+                resstate.idx += state1.idx + state2.idx
+                resstate.txt = state1.txt
+                print("RES STATE: ", resstate, resstate.idx)
 
-                return Right( (vs, res2.val[1])) 
+                return Right( resstate )
             return res2
     return Parser(curried)
 
@@ -155,15 +190,17 @@ def n(parser, count):
             if isinstance(res, Left):
                 return res
             else:
-                parsed, remaining = res.unwrap()
+                parsed, remaining = res.state.val
                 s = remaining
                 fullparsed += parsed
-        return Right((fullparsed, s))
+        state = State(fullparsed, s)
+        return Right(s)
     return Parser(curried)
 
 def or_else(p1, p2):
     def curried(s):
         res = p1(s)
+        # print("RES: ", res)
         if isinstance(res, Right):
             return res
         else:
@@ -174,6 +211,7 @@ def or_else(p1, p2):
                 return Left("Failed at both") 
     return Parser(curried)
 
+
 def char(c):
     def curried(s):
         if not s:
@@ -181,7 +219,10 @@ def char(c):
             return Left(msg)
         else:
             if s[0] == c:
-                return Right((c, s[1:]) )
+                state = State(c, s[1:])
+                state.txt = s
+                state.idx += 1
+                return Right(state)
             else:
                 return Left("Expecting '%s' and found '%s'"%(c, s[0]))
     return Parser(curried)
@@ -202,8 +243,9 @@ def until_seq(seq):
             msg = "S is empty"
             return Left(msg)
         else:
+            state = State("", s)
             if seq == s[:len(seq)]:
-                return Right(("", s))
+                return Right(state)
             else:
                 return Left("Expecting '%s' and found '%s'"%(seq, s[:len(seq)]))
     return Parser(curried)
@@ -218,7 +260,9 @@ def group(p):
             if isinstance(res, Left):
                 return res
             else:
-                return Right(([res.val[0]], res.val[1]))
+                # print("RES: ", res)
+                state = State([res.state.parsed], res.state.remaining)
+                return Right(state)
     return Parser(curried)
 
 def pushseq(seq):
@@ -228,7 +272,8 @@ def pushseq(seq):
             return Left(msg)
         else:
             s = seq + s
-            return Right(("", s))
+            state = State("", s)
+            return Right(state)
 
     return Parser(curried)
 
@@ -238,7 +283,7 @@ def until(p):
         if isinstance(res, Left):
             return res
         else:
-            return Right(("", s))
+            return Right(State("", s))
     return Parser(curried)
 
 chars = parse_string
@@ -248,27 +293,30 @@ def parse_zero_or_more(parser, inp): #zero or more
     if isinstance(res, Left):
         return "", inp
     else:
-        firstval, restinpafterfirst = res.val
+        firstval, restinpafterfirst = res.state.val
         subseqvals, remaining = parse_zero_or_more(parser, restinpafterfirst)
         values = firstval
+        # print("FIRST:", firstval, "SUBSEQ: ", subseqvals)
         if subseqvals:
             if isinstance(firstval, str):
                 values = firstval+subseqvals
             elif isinstance(firstval, list):
                 values = firstval+ ([subseqvals] if isinstance(subseqvals, str) else subseqvals)
+        # print("RETURNING: ", values, remaining)
         return values, remaining
 
 def many(parser):
     def curried(s):
         values, rem = parse_zero_or_more(parser, s)
         # print("VALUES: ", values)
-        return Right((values, rem))
+        return Right(State(values, rem))
     return Parser(curried)
 
 
 def many1(parser):
     def curried(s):
-        res = run_parser(parser, s)
+        res = parser._originalf(s)
+        # print("APPLYING ORIGINALF ON ", s )
         if isinstance(res, Left):
             return res
         else:
@@ -277,7 +325,7 @@ def many1(parser):
 
 
 def optionally(parser):
-    noneparser = Parser(lambda x: Right( (Nothing(), "")))
+    noneparser = Parser(lambda x: Right( State(Nothing(), "")))
     return or_else(parser, noneparser)
 
 def sep_by1(sep, parser):
@@ -285,7 +333,7 @@ def sep_by1(sep, parser):
     return parser >> many(sep_then_parser)
 
 def sep_by(sep, parser):
-    return (sep_by1(sep, parser) | Parser(lambda x: Right( ([], ""))))
+    return (sep_by1(sep, parser) | Parser(lambda x: Right( State([], ""))))
 
 def forward(parsergeneratorfn):
     def curried(s):
@@ -296,12 +344,14 @@ letter = any_of(string.ascii_letters)
 lletter = any_of(string.ascii_lowercase)
 uletter = any_of(string.ascii_uppercase)
 digit = any_of(string.digits)
-digits = many1(digit)
+digits = many1(digit).map((lambda l: ["".join(l)]))
 whitespace = any_of(string.whitespace)
 ws = whitespace.suppress()
-letters = many1(letter)
+whites = many(ws)
+letters = many1(letter).map((lambda l: ["".join(l)]))
 word = letters
-alphanumword = many(letter >> (letters|digits))
+newline = char("\n")
+alphanumword = (letter >> (letters|digits)).map((lambda l: ["".join(l)]))
 num_as_int = digits.map(lambda l: int("".join(l)))
 between = lambda p1, p2 , p3 : p1 >> p2 >> p3
 surrounded_by = lambda surparser, contentparser: surparser >> contentparser >> surparser

@@ -1,38 +1,57 @@
 from pyparsec import *
-# aparser = char("a")
-# bparser = char("b")
-# print(aparser("a"))
+aparser = char("a")
+bparser = char("b")
+print(aparser("a"))
 
-# print(aparser("abc"))
-# print(bparser("b"))
-# print(bparser("bca"))
+print(aparser("abc"))
+print(bparser("b"))
+print(bparser("bca"))
 
-# abparser = aparser >> bparser
-# print(abparser("abc"))
+abparser = aparser >> bparser
+print(abparser("abc"))
 
-# abcdeparser = any_of(list("abcde"))
-# print(abcdeparser("abcde"))
+abcdeparser = any_of(list("abcde"))
+print(abcdeparser("abcde"))
 
-# abcparser = parse_string("abc")
-# print(abcparser("abc"))
+abcparser = parse_string("abc")
+print(abcparser("abc"))
 
-lowerparser = many1(lletter)
-# print(lowerparser("abcA"))
+lowerparser = many1(lletter).map(lambda l:"".join(l))
+print(lowerparser("abcA"))
 
-# print(digits("12abc"))
+print(digits("12abc"))
 
-# twodigitparser = group((digit >> digit))
-# print(twodigitparser("12abcd"))
+twodigitparser = group(digit >> digit).map(lambda l: "".join(l[0]))
+print(twodigitparser("12abcd"))
 
-# manyAparser = group(many(char("a")))
-# print(manyAparser("aaab"))
+manyAparser = group(many(char("a")))
+print(manyAparser("aaab"))
 
-print(lowerparser("helloworld"))
-whitespaceGreeting = whitespace >> lowerparser
-print(whitespaceGreeting("\thello"))
+manyAparser = many(char("a"))
+print(manyAparser("aaab"))
 
-aquestionparser = char("a") >> optionally(char("?"))
-print(aquestionparser("a?"))
+# print(lowerparser("helloworld"))
+# whitespaceGreeting = whitespace >> lowerparser.group()
+# print(whitespaceGreeting("\thello"))
 
-qparser = many(lletter) >> char("?")
-print(qparser("hello?"))
+# aquestionparser = char("a") >> optionally(char("?"))
+# print(aquestionparser("a?"))
+
+# qparser = many(lletter).group() >> char("?")
+# print(qparser("hello?"))
+
+# aorbparser = aparser | bparser
+# print(aorbparser("acd"))
+# print(aorbparser("bcd"))
+
+
+# valp = forward(lambda:  digits | listp) 
+# listp = char("{").suppress() >> sep_by(char(",").suppress(),many(valp).group()) >> char("}").suppress()
+
+# print(run_parser(valp, "4"))
+# print(valp("{8,6,7}"))
+# print(valp("{1,2,{1,2}}"))
+
+# surp = char("'")
+# qword = surrounded_by(surp, many(any_of(string.ascii_letters)))
+# print(qword("'hello'"))

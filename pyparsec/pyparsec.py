@@ -176,6 +176,8 @@ def and_then(p1, p2):
             return res1
         else:
             state1 = res1.state
+            if isinstance(state1, str):
+                import ipdb; ipdb.set_trace()
             res2 = p2(state1.remaining) # parse remaining chars.
             if isinstance(res2, Right):
                 state2 = res2.state
@@ -205,7 +207,7 @@ def n(parser, count):
                 s = remaining
                 fullparsed += parsed
         state = State(fullparsed, s)
-        return Right(s)
+        return Right(state)
     return Parser(curried)
 
 def or_else(p1, p2):

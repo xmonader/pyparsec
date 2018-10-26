@@ -66,7 +66,6 @@ def test_digits_parser():
 def test_many_parser():
     manyAparser = many(char("a"))
     res = manyAparser("aaab")
-    print(res)
     assert ("aaa", "b") == res.unwrap()
     res = manyAparser("bbc") # zero or more
     assert res.unwrap() == ("", "bbc")
@@ -152,3 +151,12 @@ def test_quoted_word_parser():
     
     res = qword("'hello'")
     assert res.unwrap() == ("'hello'", "")
+
+
+def test_parse_uuid():
+    s = "db9674c4-72a9-4ab9-9ddd-1d641a37cde4"
+    hexstr = any_of(string.hexdigits)
+    dash = char("-").suppress()
+    uuidparser =(hexstr*8).group() >> dash >> (hexstr*4).group() >> dash >>  (hexstr*4).group() >> dash >> (hexstr*4).group() >> dash >> (hexstr*12).group()
+    print(uuidparser(s))
+    # assert False

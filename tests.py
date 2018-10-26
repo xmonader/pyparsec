@@ -66,10 +66,10 @@ def test_digits_parser():
 def test_many_parser():
     manyAparser = many(char("a"))
     res = manyAparser("aaab")
-    assert "aaa", "b" == res.unwrap()
+    print(res)
+    assert ("aaa", "b") == res.unwrap()
     res = manyAparser("bbc") # zero or more
-    state = res.unwrap()
-    assert (""==state.parsed and "bbc"==state.remaining)
+    assert res.unwrap() == ("", "bbc")
 
 
 def test_parse_greeting():
@@ -87,32 +87,30 @@ def test_parse_many1():
 
 def test_parse_digits():
     res = digits("12345bcd")
-    state = res.unwrap()
-    assert  state.parsed, state.remaining == ("12345", "bcd")
+    assert "12345", "bcd" == res.unwrap()
 
 def test_parse_question():
     aquestionparser = char("a") >> optionally(char("?"))
     res = aquestionparser("a?")
-    state = res.unwrap()
-    assert state.parsed, state.remaining == (["a", "?"], "")
+    assert  ["a", "?"], "" == res.unwrap()
     res = aquestionparser("a")
-    state = res.unwrap()
-    assert state.parsed, state.remaining == (["a", Nothing()], "") 
+    assert ["a", nothing], "" == res.unwrap()  
 
 
 def test_abspace_cd_parsed():
     ab_space_cd_parser = parse_string("ab") >> many1(whitespace).suppress() >> parse_string("cd")
     res = ab_space_cd_parser("ab cd")
-    assert res.value() == (["ab","cd"], "")
-
+    assert res.unwrap() == (["ab","cd"], "")
     ab_space_cd_ef_parser = parse_string("ab") >> many1(whitespace).suppress() >> parse_string("cd") >> parse_string("ef")
     res = ab_space_cd_ef_parser("ab cdef")
-    assert res.value() == (["ab", "cd", "ef"], "")
+    assert res.unwrap() == (["ab", "cd", "ef"], "")
 
 
-# adigitlist = sep_by(whitespace.suppress(), digit)
-# res = adigitlist('1 2 3 4 5')
-# assert res.unwrap() == (["1", "2", "3", "4", "5"], "")
+def test_digitlist_parser():
+    adigitlist = sep_by(whitespace.suppress(), digit)
+    res = adigitlist('1 2 3 4 5')
+    assert res.unwrap() == (["1", "2", "3", "4", "5"], "")
+
 
 # # from functools import partial
 # # def add2(x, y):
@@ -138,14 +136,19 @@ def test_abspace_cd_parsed():
 # # p = numparser >> numparser >> numparser
 # # print(run_parser(p, "123"))
 
+def test_parse_forward_decl():
+    valp = forward(lambda:  digits | listp) 
+    listp = char("[") >> sep_by(char(",").suppress(),many(valp)) >> char("]")
+    res = valp("4")
+    assert res.unwrap() == ("4", "")
+    res = valp("[8,6,7]")
+    assert res.unwrap() == (["[", "8", "6", "7", "]"], "")
+    # print(valp("[1,2,[1,2]]"))
+    # assert True
 
-# valp = forward(lambda:  digits | listp) 
-# listp = char("[") >> sep_by(char(",").suppress(),many(valp)) >> char("]")
-
-# print(run_parser(valp, "4"))
-# print(valp("[8,6,7]"))
-# print(valp("[1,2,[1,2]]"))
-
-# surp = char("'")
-# qword = surrounded_by(surp, many(any_of(string.ascii_letters)))
-# print(qword("'hello'"))
+def test_quoted_word_parser():
+    surp = char("'")
+    qword = surrounded_by(surp, many(any_of(string.ascii_letters))).map(lambda l: "".join(l))
+    
+    res = qword("'hello'")
+    assert res.unwrap() == ("'hello'", "")

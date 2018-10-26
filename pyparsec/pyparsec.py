@@ -25,6 +25,9 @@ class Nothing(Maybe):
     def __str__(self):
         return "<Nothing>"
 
+
+nothing = Nothing() 
+
 class Either:
     pass
 
@@ -44,9 +47,6 @@ class Right:
         self.state = state
 
     def unwrap(self):
-        return self.state
-    
-    def value(self):
         return self.state.parsed, self.state.remaining
 
     # @property
@@ -102,7 +102,6 @@ class Parser:
         return self.f(*args, **kwargs)
 
     def parse(self, *args, **kwargs):
-        # print("Calling parse with args: ", *args)
         res = self.f(*args, **kwargs)
         for t in self.transformers:
             res = res.map(t)
@@ -120,8 +119,10 @@ class Parser:
         return or_else(self, rparser)
 
     def map(self, transformer):
-        self.transformers.append(transformer)
-        return self
+        import copy
+        p = copy.deepcopy(self)
+        p.transformers.append(transformer)
+        return p 
 
     def __mul__(self, times):
        return n(self, times) 
@@ -164,7 +165,7 @@ def _isokval(v):
         return False
     if isinstance(v, list) and v and v[0] == "":
         return False
-    if isinstance(v, Nothing):
+    if v == nothing:
         return False
     return True
 
@@ -181,7 +182,6 @@ def and_then(p1, p2):
                 v1 = state1.parsed
                 v2 = state2.parsed
                 vs = []
-                print(v1, v2)
                 if not p1._suppressed and _isokval(v1):
                     vs += v1
                 if not p2._suppressed and _isokval(v2):
@@ -246,7 +246,7 @@ def any_of(chars):
     return choice(list(map(char, chars)))
 
 def parse_string(s):
-    return foldl(and_then, list(map(char, list(s)))).map(lambda l: "".join(l))
+    return group(foldl(and_then, list(map(char, list(s)))).map(lambda l: "".join(l)))
 
 def until_seq(seq):
     def curried(s):
@@ -271,7 +271,6 @@ def group(p):
             if isinstance(res, Left):
                 return res
             else:
-                # print("RES: ", res)
                 state = State([res.state.parsed], res.state.remaining)
                 return Right(state)
     return Parser(curried)
@@ -319,7 +318,6 @@ def parse_zero_or_more(parser, inp): #zero or more
 def many(parser):
     def curried(s):
         values, rem = parse_zero_or_more(parser, s)
-        # print("VALUES: ", values)
         return Right(State(values, rem))
     return Parser(curried)
 
@@ -335,7 +333,7 @@ def many1(parser):
 
 
 def optionally(parser):
-    noneparser = Parser(lambda x: Right( State(Nothing(), "")))
+    noneparser = Parser(lambda x: Right( State(nothing, "")))
     return or_else(parser, noneparser)
 
 def sep_by1(sep, parser):
@@ -354,7 +352,7 @@ letter = any_of(string.ascii_letters)
 lletter = any_of(string.ascii_lowercase)
 uletter = any_of(string.ascii_uppercase)
 digit = any_of(string.digits)
-digits = many1(digit).map((lambda l: ["".join(l)]))
+digits = many1(digit).map((lambda l: "".join(l)))
 whitespace = any_of(string.whitespace)
 ws = whitespace.suppress()
 whites = many(ws)
@@ -362,7 +360,7 @@ letters = many1(letter).map((lambda l: ["".join(l)]))
 word = letters
 newline = char("\n")
 alphanumword = (letter >> (letters|digits)).map((lambda l: ["".join(l)]))
-num_as_int = digits.map(lambda l: int("".join(l)))
+# num_as_int = digits.map(lambda l: int("".join(l)))
 between = lambda p1, p2 , p3 : p1 >> p2 >> p3
 surrounded_by = lambda surparser, contentparser: surparser >> contentparser >> surparser
 quotedword = surrounded_by( (char('"')|char("'")).suppress() , word)

@@ -45,6 +45,9 @@ class Right:
 
     def unwrap(self):
         return self.state
+    
+    def value(self):
+        return self.state.parsed, self.state.remaining
 
     # @property
     # def val0(self):
@@ -59,7 +62,8 @@ class Right:
     __repr__ = __str__
 
     def map(self, f):
-        return Right(State(f(self.state.parsed), self.state.remaining))
+        result = Right(State(f(self.state.parsed), self.state.remaining))
+        return result
 
 class State:
     def __init__(self, parsed, remaining=""):
@@ -92,10 +96,17 @@ class Parser:
         self.name = ""
         self._suppressed = False
         self._originalf = self.f
+        self.transformers = []
+
+    def check(self, *args, **kwargs):
+        return self.f(*args, **kwargs)
 
     def parse(self, *args, **kwargs):
         # print("Calling parse with args: ", *args)
-        return self.f(*args, **kwargs)
+        res = self.f(*args, **kwargs)
+        for t in self.transformers:
+            res = res.map(t)
+        return res 
 
     __call__ = parse
     
@@ -109,9 +120,8 @@ class Parser:
         return or_else(self, rparser)
 
     def map(self, transformer):
-        p =  Parser(lambda *args, **kwargs: self.f(*args, **kwargs).map(transformer))
-        p._originalf = self.f
-        return p
+        self.transformers.append(transformer)
+        return self
 
     def __mul__(self, times):
        return n(self, times) 
@@ -154,6 +164,8 @@ def _isokval(v):
         return False
     if isinstance(v, list) and v and v[0] == "":
         return False
+    if isinstance(v, Nothing):
+        return False
     return True
 
 def and_then(p1, p2):
@@ -169,6 +181,7 @@ def and_then(p1, p2):
                 v1 = state1.parsed
                 v2 = state2.parsed
                 vs = []
+                print(v1, v2)
                 if not p1._suppressed and _isokval(v1):
                     vs += v1
                 if not p2._suppressed and _isokval(v2):
@@ -176,8 +189,6 @@ def and_then(p1, p2):
                 resstate = State(parsed=vs, remaining=state2.remaining)
                 resstate.idx += state1.idx + state2.idx
                 resstate.txt = state1.txt
-                print("RES STATE: ", resstate, resstate.idx)
-
                 return Right( resstate )
             return res2
     return Parser(curried)
@@ -315,8 +326,7 @@ def many(parser):
 
 def many1(parser):
     def curried(s):
-        res = parser._originalf(s)
-        # print("APPLYING ORIGINALF ON ", s )
+        res = parser.check(s)
         if isinstance(res, Left):
             return res
         else:

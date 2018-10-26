@@ -1,4 +1,18 @@
 from pyparsec import *
+
+def run_once(f):
+    def wrapper(*args, **kwargs):
+        if not wrapper.has_run:
+            wrapper.has_run = True
+            return f(*args, **kwargs)
+        else:
+            return []
+    wrapper.has_run = False
+    return wrapper
+
+action = run_once
+
+
 kv = (word >> option(whites) >> char("=").suppress() >> option(whites) >> word >> newline.suppress()).group()
 section = (char("[").suppress() >> many(word | whitespace)>> char("]").suppress() >> newline.suppress() >> many1(kv)).group()
 inifile = many1(section)

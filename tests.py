@@ -3,135 +3,149 @@ from pyparsec import *
 aparser = char("a")
 bparser = char("b")
 
-assert "a", "" == aparser("a").unwrap()
-assert "b", "" == bparser("b").unwrap()
-
-parsed, rem = aparser("abc").unwrap()
-assert parsed, rem == ("a", "bc")
-
-parsed, rem = bparser("bcd").unwrap()
-assert parsed, rem == ("b", "cd")
-
-abparser = aparser >> bparser
-parsed, rem = abparser("abc").unwrap()
-assert parsed, rem ==  ("ab", "c")
-
-aorbparser = aparser | bparser
-parsed, rem = aorbparser("acd").unwrap()
-assert parsed, rem == ("a", "cd")
-
-parsed, rem = aorbparser("bcd").unwrap()
-assert parsed, rem == ("b", "cd")
-
-abcdeparser = any_of(list("abcde"))
-res = abcdeparser("abcde")
-assert isinstance(res, Right) is True
-
-assert "a", "bcde" ==  res.unwrap()
-res = abcdeparser("ello")
-assert "e", "llo" == res.unwrap()
-assert isinstance(res, Right) is True
-
-
-abcparser = parse_string("abc")
-res = abcparser("abcd")
-assert isinstance(res, Right)
-assert "abc", "d" == res.unwrap()
-
 lowerparser = many1(lletter)
-res = lowerparser("abcA")
-assert isinstance(res, Right)
-assert "abc", "A" == res.unwrap()
 
-res = digits("12abc")
-assert isinstance(res, Right)
-assert "12", "abc" == res.unwrap()
+def test_char_parser():
+    aparser = char("a")
+    bparser = char("b")
 
-twodigitparser = digit >> digit
-res = twodigitparser("12abcd")
-assert isinstance(res, Right)
-assert "12", "abc" == res.unwrap()
+    assert "a", "" == aparser("a").unwrap()
+    assert "b", "" == bparser("b").unwrap()
 
-manyAparser = many(char("a"))
-res = manyAparser("aaab")
-assert "aaa", "b" == res.unwrap()
+def test_parser_and_remains():
+    parsed, rem = aparser("abc").unwrap()
+    assert parsed, rem == ("a", "bc")
 
+    parsed, rem = bparser("bcd").unwrap()
+    assert parsed, rem == ("b", "cd")
 
-res = manyAparser("bbc") # zero or more
-print("RES :", res)
-assert ("", "bbc") == res.unwrap()
+def test_parser_followed_by_parser():
+    abparser = aparser >> bparser
+    parsed, rem = abparser("abc").unwrap()
+    assert parsed, rem ==  ("ab", "c")
 
-whitespaceGreeting = whitespace >> many(lowerparser)
-res = whitespaceGreeting("\thello")
-assert "\t", "hello" == res.unwrap()
+def test_alternate_parser():
+    aorbparser = aparser | bparser
+    parsed, rem = aorbparser("acd").unwrap()
+    assert parsed, rem == ("a", "cd")
 
+    parsed, rem = aorbparser("bcd").unwrap()
+    assert parsed, rem == ("b", "cd")
 
-many1aParser = many1(char("a"))
-res = many1aParser("aaab")
-assert "aaa", "b" == res.unwrap()
-res = many1aParser("bbc") # one or more
-assert isinstance(res, Left) is True
+def test_anyof_parser():
 
+    abcdeparser = any_of(list("abcde"))
+    res = abcdeparser("abcde")
+    assert isinstance(res, Right) is True
+    assert "a", "bcde" ==  res.unwrap()
+    res = abcdeparser("ello")
+    assert "e", "llo" == res.unwrap()
+    assert isinstance(res, Right) is True
 
+def test_parse_string():
+    abcparser = parse_string("abc")
+    res = abcparser("abcd")
+    assert isinstance(res, Right)
+    assert "abc", "d" == res.unwrap()
 
-res = digits("12345bcd")
-assert res.unwrap() == ("12345", "bcd")
+def test_lower_parser():
+    res = lowerparser("abcA")
+    assert isinstance(res, Right)
+    assert "abc", "A" == res.unwrap()
 
+def test_digits_parser():
+    res = digits("12abc")
+    assert isinstance(res, Right)
+    assert "12", "abc" == res.unwrap()
 
-aquestionparser = char("a") >> optionally(char("?"))
-res = aquestionparser("a?")
-assert res.unwrap() == (["a", "?"], "")
+    twodigitparser = digit >> digit
+    res = twodigitparser("12abcd")
+    assert isinstance(res, Right)
+    assert "12", "abc" == res.unwrap()
 
-res = aquestionparser("a")
-assert res.unwrap() == (["a", Nothing()], "")
-
-
-
-ab_space_cd_parser = parse_string("ab") >> many1(whitespace).suppress() >> parse_string("cd")
-res = ab_space_cd_parser("ab cd")
-assert res.unwrap() == (["ab","cd"], "")
-
-ab_space_cd_ef_parser = parse_string("ab") >> many1(whitespace).suppress() >> parse_string("cd") >> parse_string("ef")
-res = ab_space_cd_ef_parser("ab cdef")
-assert res.unwrap() == (["ab", "cd", "ef"], "")
-
-
-adigitlist = sep_by(whitespace.suppress(), digit)
-res = adigitlist('1 2 3 4 5')
-assert res.unwrap() == (["1", "2", "3", "4", "5"], "")
-
-# from functools import partial
-# def add2(x, y):
-#     print("X:",x  )
-#     print("Y: ", y)
-#     return x+y
-
-# def add3(x, y, z):
-#     return x+y+z
-# def addargs(*args):
-#     print("Args: ", args)
-#     return sum(args)
-
-# numparser = num_as_int 
-# addparser2 = Parser(add2)
-# p = ap(addparser2, numparser >> numparser )
-# print(run_parser(p, "123"))
-
-# addparser3 = Parser(addargs)
-
-# p = ap(addparser3, (numparser >> numparser >> numparser) )
-# print(run_parser(p, "123"))
-# p = numparser >> numparser >> numparser
-# print(run_parser(p, "123"))
+def test_many_parser():
+    manyAparser = many(char("a"))
+    res = manyAparser("aaab")
+    assert "aaa", "b" == res.unwrap()
+    res = manyAparser("bbc") # zero or more
+    state = res.unwrap()
+    assert (""==state.parsed and "bbc"==state.remaining)
 
 
-valp = forward(lambda:  digits | listp) 
-listp = char("[") >> sep_by(char(",").suppress(),many(valp)) >> char("]")
+def test_parse_greeting():
+    whitespaceGreeting = whitespace >> many(lowerparser)
+    res = whitespaceGreeting("\thello")
+    assert "\t", "hello" == res.unwrap()
 
-print(run_parser(valp, "4"))
-print(valp("[8,6,7]"))
-print(valp("[1,2,[1,2]]"))
 
-surp = char("'")
-qword = surrounded_by(surp, many(any_of(string.ascii_letters)))
-print(qword("'hello'"))
+def test_parse_many1():
+    many1aParser = many1(char("a"))
+    res = many1aParser("aaab")
+    assert "aaa", "b" == res.unwrap()
+    res = many1aParser("bbc") # one or more
+    assert isinstance(res, Left) is True
+
+def test_parse_digits():
+    res = digits("12345bcd")
+    state = res.unwrap()
+    assert  state.parsed, state.remaining == ("12345", "bcd")
+
+def test_parse_question():
+    aquestionparser = char("a") >> optionally(char("?"))
+    res = aquestionparser("a?")
+    state = res.unwrap()
+    assert state.parsed, state.remaining == (["a", "?"], "")
+    res = aquestionparser("a")
+    state = res.unwrap()
+    assert state.parsed, state.remaining == (["a", Nothing()], "") 
+
+
+def test_abspace_cd_parsed():
+    ab_space_cd_parser = parse_string("ab") >> many1(whitespace).suppress() >> parse_string("cd")
+    res = ab_space_cd_parser("ab cd")
+    assert res.value() == (["ab","cd"], "")
+
+    ab_space_cd_ef_parser = parse_string("ab") >> many1(whitespace).suppress() >> parse_string("cd") >> parse_string("ef")
+    res = ab_space_cd_ef_parser("ab cdef")
+    assert res.value() == (["ab", "cd", "ef"], "")
+
+
+# adigitlist = sep_by(whitespace.suppress(), digit)
+# res = adigitlist('1 2 3 4 5')
+# assert res.unwrap() == (["1", "2", "3", "4", "5"], "")
+
+# # from functools import partial
+# # def add2(x, y):
+# #     print("X:",x  )
+# #     print("Y: ", y)
+# #     return x+y
+
+# # def add3(x, y, z):
+# #     return x+y+z
+# # def addargs(*args):
+# #     print("Args: ", args)
+# #     return sum(args)
+
+# # numparser = num_as_int 
+# # addparser2 = Parser(add2)
+# # p = ap(addparser2, numparser >> numparser )
+# # print(run_parser(p, "123"))
+
+# # addparser3 = Parser(addargs)
+
+# # p = ap(addparser3, (numparser >> numparser >> numparser) )
+# # print(run_parser(p, "123"))
+# # p = numparser >> numparser >> numparser
+# # print(run_parser(p, "123"))
+
+
+# valp = forward(lambda:  digits | listp) 
+# listp = char("[") >> sep_by(char(",").suppress(),many(valp)) >> char("]")
+
+# print(run_parser(valp, "4"))
+# print(valp("[8,6,7]"))
+# print(valp("[1,2,[1,2]]"))
+
+# surp = char("'")
+# qword = surrounded_by(surp, many(any_of(string.ascii_letters)))
+# print(qword("'hello'"))
